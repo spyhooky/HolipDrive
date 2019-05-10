@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QtSerialPort/QSerialPort>
 #include <QDialog>
+#include <QTimer>
 #include "Holipheader.h"
 
 #define SERIAL_MAX_BAUD_CNT     7
@@ -24,6 +25,25 @@
 #define STD_FC_DATA_INDEX_REF   13
 #define STD_FC_DATA_INDEX_END   15
 
+/*****************************************  pulbic defined  ****************************************/
+typedef enum
+{
+   INVERTER_FOUND_FC_9600          = 0,
+   INVERTER_FOUND_MODBUS_9600      = 1,
+   INVERTER_FOUND_TM_38400         = 2,
+   INVERTER_FOUND_FC_115200        = 3,
+   INVERTER_FOUND_MODBUS_115200    = 4,
+   INVERTER_FOUND_TM_115200        = 5,
+   INVERTER_FOUND_TM_MAX           = 6
+}E_FOUND_INVERTER_STEP;
+
+typedef enum
+{
+   INVERTER_PROCOTOL_FC          = 0,
+   INVERTER_PROCOTOL_MODBUS      = 1,
+   INVERTER_PROCOTOL_TM          = 2
+}E_FOUND_INVERTER_PROCOTOL;
+
 typedef	struct {
     QString name;
     qint32 baudRate;
@@ -36,6 +56,11 @@ typedef	struct {
     QString stringStopBits;
 }CURSETS;
 
+typedef struct{
+    E_FOUND_INVERTER_PROCOTOL eDetectProtocolStep;
+    bool    bDetectInverterFinish;
+}S_INVERTER_DETECT_STATE;
+
 typedef	struct {
     qint8 byDeviceType;
     qint8 byInverterAddr;
@@ -45,6 +70,11 @@ typedef	struct {
     UNSIGNED8 data[MAIN_SERIAL_FRM_LEN];
     int  len;
 } main_serial_packet_t;
+
+/******************************************************************************************/
+
+
+
 
 namespace Ui {
 class MainWindow;
@@ -66,6 +96,7 @@ private slots:
 
     void on_pushButtonFoundInverterStop_clicked();
     void readData();
+    void vParseDetectPacket();
 
 private:
     Ui::MainWindow *ui;
@@ -90,6 +121,10 @@ private:
     UNSIGNED8 byStepBaud;
     UNSIGNED8 byStopBit;
     main_serial_packet_t mainSendPkt;
+    E_FOUND_INVERTER_STEP eInverterDetectStep;
+    S_INVERTER_DETECT_STATE sMyInverterDetectState;
+    QTimer *TickTimer;
+    QByteArray RxArrayBuff;
 };
 
 #endif // MAINWINDOW_H

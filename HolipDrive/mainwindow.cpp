@@ -15,15 +15,37 @@ extern "C" {
 }
 
 
-quint32 dwBaud[SERIAL_MAX_BAUD_CNT] = {QSerialPort::Baud2400,QSerialPort::Baud4800,QSerialPort::Baud9600,QSerialPort::Baud19200,QSerialPort::Baud38400,QSerialPort::Baud57600,QSerialPort::Baud115200};
-quint8 byAddr[SERIAL_MAX_ADDR_CNT] = {1,2,3,4,5,6,7,8};
+static quint32 dwBaud[INVERTER_FOUND_TM_MAX] = {
+    QSerialPort::Baud9600,QSerialPort::Baud9600,QSerialPort::Baud38400,
+    QSerialPort::Baud115200,QSerialPort::Baud115200,QSerialPort::Baud115200
+};
+static E_FOUND_INVERTER_PROCOTOL eDetectInverterProtocol[INVERTER_FOUND_TM_MAX] = {
+    INVERTER_PROCOTOL_FC,
+    INVERTER_PROCOTOL_MODBUS,
+    INVERTER_PROCOTOL_TM,
+    INVERTER_PROCOTOL_FC,
+    INVERTER_PROCOTOL_MODBUS,
+    INVERTER_PROCOTOL_TM
+};
+//quint8 byAddr[INVERTER_FOUND_TM_MAX] = {1,2,3,4,5,6,7,8};
+static UNSIGNED8 byFeelInverterPacketFC[] = {0x01};
+static UNSIGNED8 byFeelInverterPacketMODBUS[] = {0x01};
+static UNSIGNED8 byFeelInverterPacketTM[] = {0x01};
 
+static UNSIGNED8 byMsgBuff[MAIN_SERIAL_FRM_LEN] = {0};
+static SIGNED8 cBuffRx[MAIN_SERIAL_FRM_LEN]={0};
+static UNSIGNED8 byBuffRxLen=0;
+static SIGNED8 * pcBuffRxPos=NULL;
+static SIGNED8 cComParseBuff[MAIN_SERIAL_FRM_LEN]={0};
+static UNSIGNED8 byComParseLen=0;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+
 
     //start init fram
     vInitMainFram();
@@ -150,102 +172,108 @@ void MainWindow::vFindInverterProcess()
 
     mainSerial->setDataBits(QSerialPort::Data8);
 
-    while(byStepAddr<SERIAL_MAX_ADDR_CNT)
+    /*
+     *
+     *loop stopbit
+     *
+     *
+    */
+    switch(byStopBit)
     {
-        while(byStepBaud<SERIAL_MAX_BAUD_CNT)
+        case 0:
+        SerialSettings.stringCheck = "Even";
+        SerialSettings.stringStopBits = "1";
+        mainSerial->setStopBits(QSerialPort::OneStop);
+        mainSerial->setParity(QSerialPort::EvenParity);
+        break;
+
+        case 1:
+        SerialSettings.stringCheck = "Odd";
+        SerialSettings.stringStopBits = "1";
+        mainSerial->setStopBits(QSerialPort::OneStop);
+        mainSerial->setParity(QSerialPort::OddParity);
+        break;
+
+        case 2:
+        SerialSettings.stringCheck = "None";
+        SerialSettings.stringStopBits = "1";
+        mainSerial->setStopBits(QSerialPort::OneStop);
+        mainSerial->setParity(QSerialPort::NoParity);
+        break;
+
+        case 3:
+        SerialSettings.stringCheck = "None";
+        SerialSettings.stringStopBits = "2";
+        mainSerial->setStopBits(QSerialPort::TwoStop);
+        mainSerial->setParity(QSerialPort::NoParity);
+        break;
+
+        default:
+        break;
+
+    }
+    /*
+     *
+     *loop baud and procotol
+     *
+     *
+    */
+    switch(eInverterDetectStep)
+    {
+        case INVERTER_FOUND_FC_9600:
+            SerialSettings.baudRate = dwBaud[eInverterDetectStep];
+            DriveType.byInverterAddr = 1;
+            SerialSettings.stringBaudRate = QString::number(SerialSettings.baudRate);
+            mainSerial->setPortName(SerialSettings.name);
+            mainSerial->setBaudRate(SerialSettings.baudRate);
+        break;
+
+        case INVERTER_FOUND_FC_115200:
+        break;
+
+        default:break;
+
+    }
+    sMyInverterDetectState.eDetectProtocolStep = eDetectInverterProtocol[eInverterDetectStep];
+    /*
+     *
+     * start serial com
+     *
+     *
+    */
+    if(!mainCommConnect)
+    {
+        if (mainSerial->open(QIODevice::ReadWrite))
         {
-            while(byStopBit<SERIAL_STOP_BIT_CNT)
-            {
-                SerialSettings.baudRate =  dwBaud[byStepBaud];
-                DriveType.byInverterAddr = byAddr[byStepAddr];
-                SerialSettings.stringBaudRate = QString::number(SerialSettings.baudRate);
-                mainSerial->setPortName(SerialSettings.name);
-                mainSerial->setBaudRate(SerialSettings.baudRate);
-
-                switch(byStopBit)
-                {
-                    case 0:
-                    SerialSettings.stringCheck = "Even";
-                    SerialSettings.stringStopBits = "1";
-                    mainSerial->setStopBits(QSerialPort::OneStop);
-                    mainSerial->setParity(QSerialPort::EvenParity);
-                    break;
-
-                    case 1:
-                    SerialSettings.stringCheck = "Odd";
-                    SerialSettings.stringStopBits = "1";
-                    mainSerial->setStopBits(QSerialPort::OneStop);
-                    mainSerial->setParity(QSerialPort::OddParity);
-                    break;
-
-                    case 2:
-                    SerialSettings.stringCheck = "None";
-                    SerialSettings.stringStopBits = "1";
-                    mainSerial->setStopBits(QSerialPort::OneStop);
-                    mainSerial->setParity(QSerialPort::NoParity);
-                    break;
-
-                    case 3:
-                    SerialSettings.stringCheck = "None";
-                    SerialSettings.stringStopBits = "2";
-                    mainSerial->setStopBits(QSerialPort::TwoStop);
-                    mainSerial->setParity(QSerialPort::NoParity);
-                    break;
-
-                    default:
-                    break;
-
-                }
-
-                if(!mainCommConnect)
-                {
-                    if (mainSerial->open(QIODevice::ReadWrite))
-                    {
-                        show.append(SerialSettings.name);
-                        show.append("已连接");
-                        show.append(",");
-                        show.append(SerialSettings.stringBaudRate);
-                        show.append(",");
-                        show.append(SerialSettings.stringDataLen);
-                        show.append(",");
-                        show.append(SerialSettings.stringCheck);
-                        show.append(",");
-                        show.append(SerialSettings.stringStopBits);
-                        mainCommConnect = true;
-                    }
-                    else
-                    {
-                        mainCommConnect = false;
-                        show.append(SerialSettings.name);
-                        show.append(" 打开失败");
-                        myHelper::ShowMessageBoxError("打开串口失败！");
-                    }
-
-                }
-                else
-                {
-                    show.append(SerialSettings.name);
-                    show.append("已经打开了");
-                }
-                ui->textBrowserResponse->append(show);
-                byStopBit++;
-                if(byStopBit>=SERIAL_STOP_BIT_CNT)
-                {
-                    byStopBit = 0;
-                    byStepBaud++;
-                    if(byStepBaud>=SERIAL_MAX_BAUD_CNT)
-                    {
-                        byStepBaud = 0;
-                        byStepAddr++;
-                    }
-                }
-                return;
-            }
+            show.append(SerialSettings.name);
+            show.append("已连接");
+            show.append(",");
+            show.append(SerialSettings.stringBaudRate);
+            show.append(",");
+            show.append(SerialSettings.stringDataLen);
+            show.append(",");
+            show.append(SerialSettings.stringCheck);
+            show.append(",");
+            show.append(SerialSettings.stringStopBits);
+            mainCommConnect = true;
+            this->wSerialSend((SIGNED8*)byFeelInverterPacketTM,sizeof(byFeelInverterPacketTM));
+            TickTimer->start(1000);//this scale is ms
+        }
+        else
+        {
+            mainCommConnect = false;
+            show.append(SerialSettings.name);
+            show.append(" 打开失败");
+            myHelper::ShowMessageBoxError("打开串口失败！");
         }
 
     }
-
-    //if run here , it means the whole loop is finish and do not find the inverter
+    else
+    {
+        show.append(SerialSettings.name);
+        show.append("已经打开了");
+    }
+    ui->textBrowserResponse->append(show);
 
 
 }
@@ -268,17 +296,23 @@ void MainWindow::vInitLoopData()
     byStepAddr = 0;
     byStepBaud = 0;
     byStopBit = 0;
+    eInverterDetectStep = INVERTER_FOUND_FC_9600;
+    sMyInverterDetectState.eDetectProtocolStep = INVERTER_PROCOTOL_FC;
+    sMyInverterDetectState.bDetectInverterFinish = false;
 }
 
 void MainWindow::vInitSignalConnect()
 {
     //链接通信串口接收数据
     connect(mainSerial, SIGNAL(readyRead()), this, SLOT(readData()));
+    //
+    connect(TickTimer, SIGNAL(timeout()), this, SLOT(vParseDetectPacket()));
 }
 
 void MainWindow::vInitNewObject()
 {
     mainSerial = new QSerialPort(this);
+    TickTimer = new QTimer(this);
 }
 
 void MainWindow::on_pushButtonFoundInverter_clicked()
@@ -305,5 +339,68 @@ void MainWindow::on_pushButtonFoundInverterStop_clicked()
 
 void MainWindow::readData()
 {
+    QString show;
 
+    if(mainCommConnect)
+    {
+        memset(byMsgBuff,0,sizeof(byMsgBuff));
+
+        QByteArray todRcvBuf = mainSerial->readAll();
+        show = todRcvBuf.data();
+        ui->textBrowserResponse->append(show);
+
+        if(todRcvBuf.isEmpty())
+        {
+            return;
+        }
+        RxArrayBuff.clear();
+        pcBuffRxPos = cBuffRx;
+        memset(cBuffRx,0,MAIN_SERIAL_FRM_LEN);
+        RxArrayBuff += todRcvBuf;
+
+        pcBuffRxPos = RxArrayBuff.data();
+        byBuffRxLen = RxArrayBuff.length();
+        /*
+        *
+        *fill the serial packet
+        *
+        */
+        if(byBuffRxLen>0){
+            if(byBuffRxLen + byComParseLen > MAIN_SERIAL_FRM_LEN){
+                byComParseLen = 0;
+                memset(cComParseBuff,0,sizeof(cComParseBuff));
+            }
+            memcpy(cComParseBuff+byBuffRxLen,pcBuffRxPos,byBuffRxLen);
+            byBuffRxLen += byBuffRxLen;
+        }
+    }
+}
+
+void MainWindow::vParseDetectPacket()
+{
+    TickTimer->stop();
+    /*
+     *
+     *parse the reponse packet with FC or MODBUS or TM CMD , then set mode which is in
+     *
+     *
+    */
+
+
+
+    /*
+     *
+     *if parse packet succeed set  sMyInverterDetectState.bDetectInverterFinish = true
+     *
+     *
+     */
+    QString show;
+    show.append("已经找到变频器");
+
+    /*
+     *
+     *if false == sMyInverterDetectState.bDetectInverterFinish , then  eInverterDetectStep++ ,  and go on detect inverter
+     *
+     *
+    */
 }
