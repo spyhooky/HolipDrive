@@ -39,6 +39,28 @@ static SIGNED8 * pcBuffRxPos=NULL;
 static SIGNED8 cComParseBuff[MAIN_SERIAL_FRM_LEN]={0};
 static UNSIGNED8 byComParseLen=0;
 
+/*
+ *  FC->
+ * 3887=1:      02 0e 3f 2f 2f 00 00 00 00 00 01 04 3c 00 00 0a
+ * 3886=11536:  02 0e 3f 2f 2e 00 00 00 00 2d 10 04 3c 00 00 37
+ * 3886=10512:  02 0e 3f 2f 2e 00 00 00 00 29 10 04 3c 00 00 33
+ * 1429=6111:   02 0e 3f 25 95 00 00 00 00 17 df 04 3c 00 00 73
+ * 1428=1:      02 0e 3f 25 94 00 00 00 00 00 01 04 3c 00 00 bb
+ *
+ *  MODBUS->
+ * 3887=1:      01 06 97 d5 00 01 75 86
+ * 3886=11536:  01 06 97 cb 2d 10 C8 DC
+ * 3886=10512:  01 06 97 cb 29 10 CA 1C
+ * 1429=6111:   01 06 37 d1 17 df 99 EF
+ * 1428=1:      01 06 37 c7 00 01 F7 83
+*/
+
+static SIGNED8 cPacket_3887_1_FC[] = {0x02 ,0x0e ,0x3f ,0x2f ,0x2f ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x01 ,0x04 ,0x3c ,0x00 ,0x00 ,0x0a};
+static SIGNED8 cpacket_3886_11536_FC[] = {02 0e 3f 2f 2e 00 00 00 00 2d 10 04 3c 00 00 37};
+static SIGNED8 cpacket_3886_10512_FC[] = {02 0e 3f 2f 2e 00 00 00 00 29 10 04 3c 00 00 33};
+static SIGNED8 cpacket_1429_FC[] = {02 0e 3f 25 95 00 00 00 00 17 df 04 3c 00 00 73};
+static SIGNED8 cpacket_1428_FC[] = {02 0e 3f 25 94 00 00 00 00 00 01 04 3c 00 00 bb};
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -313,6 +335,69 @@ void MainWindow::vInitNewObject()
 {
     mainSerial = new QSerialPort(this);
     TickTimer = new QTimer(this);
+}
+
+/**********************************************************************
+ * Description:
+ *
+ *
+ *  typedef enum
+    {
+       INVERTER_FOUND_FC_9600          = 0,
+       INVERTER_FOUND_MODBUS_9600      = 1,
+       INVERTER_FOUND_TM_38400         = 2,
+       INVERTER_FOUND_FC_115200        = 3,
+       INVERTER_FOUND_MODBUS_115200    = 4,
+       INVERTER_FOUND_TM_115200        = 5,
+       INVERTER_FOUND_TM_MAX           = 6
+    }E_FOUND_INVERTER_STEP;
+ *
+ *  FC->
+ * 3887=1:      02 0e 3f 2f 2f 00 00 00 00 00 01 04 3c 00 00 0a
+ * 3886=11536:  02 0e 3f 2f 2e 00 00 00 00 2d 10 04 3c 00 00 37
+ * 3886=10512:  02 0e 3f 2f 2e 00 00 00 00 29 10 04 3c 00 00 33
+ * 1429=6111:   02 0e 3f 25 95 00 00 00 00 17 df 04 3c 00 00 73
+ * 1428=1:      02 0e 3f 25 94 00 00 00 00 00 01 04 3c 00 00 bb
+ *
+ *  MODBUS->
+ * 3887=1:      01 06 97 d5 00 01 75 86
+ * 3886=11536:  01 06 97 cb 2d 10 C8 DC
+ * 3886=10512:  01 06 97 cb 29 10 CA 1C
+ * 1429=6111:   01 06 37 d1 17 df 99 EF
+ * 1428=1:      01 06 37 c7 00 01 F7 83
+ *
+ * Input:
+ * Output:
+ * Auther: HYQ
+ **********************************************************************/
+void MainWindow::vSetInverter2TM()
+{
+    if(!sMyInverterDetectState.bDetectInverterFinish)
+    {
+        QString show;
+        show.append("变频器未找到，请先寻找变频器！");
+        ui->textBrowserResponse->append(show);
+    }
+    if((INVERTER_FOUND_FC_9600 == eInverterDetectStep) ||
+       (INVERTER_FOUND_FC_115200 == eInverterDetectStep))
+    {
+        /*
+         *(1)3887=1
+         *(2)3886=11536 or 10512
+         *(3)1429=6111
+         *(4)1428=1
+        */
+    }
+    else if((INVERTER_FOUND_MODBUS_9600 == eInverterDetectStep)||
+            (INVERTER_FOUND_MODBUS_115200 == eInverterDetectStep))
+    {
+        /*
+         *(1)3887=1
+         *(2)3886=11536 or 10512
+         *(3)1429=6111
+         *(4)1428=1
+        */
+    }
 }
 
 void MainWindow::on_pushButtonFoundInverter_clicked()

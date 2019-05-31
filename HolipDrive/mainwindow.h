@@ -111,6 +111,7 @@ private:
     void vInitLoopData();
     void vInitSignalConnect();
     void vInitNewObject();
+    void vSetInverter2TM();
 
 private:
     CURSETS SerialSettings;
