@@ -28,9 +28,11 @@
 
 //-------------------- include files ----------------------------------------
 //-------------------- public definitions -----------------------------------
+#define UNSIGNED8MASK  0xff
 //-------------------- public data ------------------------------------------
 //-------------------- public functions -------------------------------------
 UNSIGNED8 Crc8_byCalCrc8(UNSIGNED8 *pbyData, UNSIGNED32 dwDataLen, UNSIGNED8 byCrc8);
+UNSIGNED8 FcCheckSum(UNSIGNED8 *pbyData, UNSIGNED32 dwDataLen);
 #endif    /* define CRC8_H */ 
 /** @} *//* End of group */
 //---------------------------------------------------------------------------

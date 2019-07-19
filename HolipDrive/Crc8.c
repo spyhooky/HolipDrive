@@ -96,6 +96,16 @@ UNSIGNED8 Crc8_byCalCrc8(UNSIGNED8 *pbyData, UNSIGNED32 dwDataLen, UNSIGNED8 byC
    return byCrc8;
 }
 
+UNSIGNED8 FcCheckSum(UNSIGNED8 *pbyData, UNSIGNED32 dwDataLen)
+{
+   UNSIGNED8 byCrc8=0;
+   while(dwDataLen-- > 0)
+   {
+      byCrc8 = byCrc8^(pbyData[dwDataLen]);
+   }
+   return byCrc8;
+}
+
 /** @} *//* End of group */
 //---------------------------------------------------------------------------
 //  End of file

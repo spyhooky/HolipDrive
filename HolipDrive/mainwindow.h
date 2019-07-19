@@ -7,12 +7,18 @@
 #include <QTimer>
 #include "Holipheader.h"
 
+
+
+#define DEBUG_DEVICE_DETECT     1
+
+
+
 #define SERIAL_MAX_BAUD_CNT     7
 #define SERIAL_MAX_ADDR_CNT     8
 
 #define SERIAL_STOP_BIT_CNT     4
 
-#define	MAIN_SERIAL_FRM_LEN		256
+#define	MAIN_SERIAL_FRM_LEN		255
 
 #define STD_FC_HEADER           0x02
 #define STD_FC_DATA_INDEX_STX   0
@@ -24,6 +30,9 @@
 #define STD_FC_DATA_INDEX_CTW   11
 #define STD_FC_DATA_INDEX_REF   13
 #define STD_FC_DATA_INDEX_END   15
+
+
+#define MAX_LOOP_STOPBIT        3
 
 /*****************************************  pulbic defined  ****************************************/
 typedef enum
@@ -112,6 +121,9 @@ private:
     void vInitSignalConnect();
     void vInitNewObject();
     void vSetInverter2TM();
+    bool bParseSerialMsg();
+    void vDetectStepCheck();
+    void vDetectCloseCom();
 
 private:
     CURSETS SerialSettings;

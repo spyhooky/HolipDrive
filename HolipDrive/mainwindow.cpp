@@ -8,6 +8,7 @@
 #include "Holipheader.h"
 #include "api/myhelper.h"
 #include "api/myapp.h"
+#include <synchapi.h>
 
 extern "C" {
 #include "Sharebits.h"
@@ -28,17 +29,20 @@ static E_FOUND_INVERTER_PROCOTOL eDetectInverterProtocol[INVERTER_FOUND_TM_MAX] 
     INVERTER_PROCOTOL_TM
 };
 //quint8 byAddr[INVERTER_FOUND_TM_MAX] = {1,2,3,4,5,6,7,8};
-static UNSIGNED8 byFeelInverterPacketFC[] = {0x01};
-static UNSIGNED8 byFeelInverterPacketMODBUS[] = {0x01};
-static UNSIGNED8 byFeelInverterPacketTM[] = {0x01};
-
+static QString BaudLog[6] = {"FC_9600","MODBUS_9600","TM_38400","FC_115200","MODBUS_115200","TM_115200"};
+static UNSIGNED8 byFeelInverterPacketFC[] = {0x02,0x0e,0x01,0x11,0x2f,0x00,0x00,0x00,0x00,0x00,0x00,0x04,0x74,0x00,0x00,0x43};
+static UNSIGNED8 byFeelInverterPacketMODBUS[] = {0x01,0x01,0x00,0x30,0x00,0x10,0x3d,0xc9};
+//static UNSIGNED8 byFeelInverterPacketCUTM[] = {64 74 6D 20 63 75 20 76 65 72 73 69 6F 6E};
+static UNSIGNED8 byFeelInverterPacketPUTM[] = {0x64 ,0x74 ,0x6D ,0x20 ,0x70 ,0x75 ,0x20 ,0x76 ,0x65 ,0x72 ,0x73 ,0x69 ,0x6F ,0x6E , 0x0d , 0x0a};//'dtm pu version'
+static UNSIGNED8 byFeelInverterPacketAOCTM[] = {0x76 ,0x65 ,0x72 ,0x73 ,0x69 ,0x6F ,0x6E};
 static UNSIGNED8 byMsgBuff[MAIN_SERIAL_FRM_LEN] = {0};
 static SIGNED8 cBuffRx[MAIN_SERIAL_FRM_LEN]={0};
 static UNSIGNED8 byBuffRxLen=0;
 static SIGNED8 * pcBuffRxPos=NULL;
 static SIGNED8 cComParseBuff[MAIN_SERIAL_FRM_LEN]={0};
 static UNSIGNED8 byComParseLen=0;
-
+static UNSIGNED8 byFeelBuff[MAIN_SERIAL_FRM_LEN] = {0};
+static UNSIGNED8 byFeelLen = 0;
 /*
  *  FC->
  * 3887=1:      02 0e 3f 2f 2f 00 00 00 00 00 01 04 3c 00 00 0a
@@ -56,10 +60,10 @@ static UNSIGNED8 byComParseLen=0;
 */
 
 static SIGNED8 cPacket_3887_1_FC[] = {0x02 ,0x0e ,0x3f ,0x2f ,0x2f ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x01 ,0x04 ,0x3c ,0x00 ,0x00 ,0x0a};
-static SIGNED8 cpacket_3886_11536_FC[] = {02 0e 3f 2f 2e 00 00 00 00 2d 10 04 3c 00 00 37};
-static SIGNED8 cpacket_3886_10512_FC[] = {02 0e 3f 2f 2e 00 00 00 00 29 10 04 3c 00 00 33};
-static SIGNED8 cpacket_1429_FC[] = {02 0e 3f 25 95 00 00 00 00 17 df 04 3c 00 00 73};
-static SIGNED8 cpacket_1428_FC[] = {02 0e 3f 25 94 00 00 00 00 00 01 04 3c 00 00 bb};
+static SIGNED8 cpacket_3886_11536_FC[] = {0x02 ,0x0e ,0x3f ,0x2f ,0x2e ,0x00 ,0x00 ,0x00 ,0x00 ,0x2d ,0x10 ,0x04 ,0x3c ,0x00 ,0x00 ,0x37};
+static SIGNED8 cpacket_3886_10512_FC[] = {0x02 ,0x0e ,0x3f ,0x2f ,0x2e ,0x00 ,0x00 ,0x00 ,0x00 ,0x29 ,0x10 ,0x04 ,0x3c ,0x00 ,0x00 ,0x33};
+static SIGNED8 cpacket_1429_FC[] = {0x02 ,0x0e ,0x3f ,0x25 ,0x95 ,0x00 ,0x00 ,0x00 ,0x00 ,0x17 ,0xdf ,0x04 ,0x3c ,0x00 ,0x00 ,0x73};
+static SIGNED8 cpacket_1428_FC[] = {0x02 ,0x0e ,0x3f ,0x25 ,0x94 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x01 ,0x04 ,0x3c ,0x00 ,0x00 ,0xbb};
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -191,6 +195,7 @@ void MainWindow::vEnableSelect(bool bFlag)
 void MainWindow::vFindInverterProcess()
 {
     QString show;
+    QString DetectLog;
 
     mainSerial->setDataBits(QSerialPort::Data8);
 
@@ -234,6 +239,7 @@ void MainWindow::vFindInverterProcess()
         break;
 
     }
+    DetectLog.append(SerialSettings.stringCheck);
     /*
      *
      *loop baud and procotol
@@ -248,6 +254,10 @@ void MainWindow::vFindInverterProcess()
             SerialSettings.stringBaudRate = QString::number(SerialSettings.baudRate);
             mainSerial->setPortName(SerialSettings.name);
             mainSerial->setBaudRate(SerialSettings.baudRate);
+            byFeelLen = sizeof(byFeelInverterPacketFC);
+            //'dtm pu version'
+            memcpy(byFeelBuff,byFeelInverterPacketFC,byFeelLen);
+
         break;
 
         case INVERTER_FOUND_FC_115200:
@@ -255,6 +265,10 @@ void MainWindow::vFindInverterProcess()
 
         default:break;
 
+    }
+    if(eInverterDetectStep < INVERTER_FOUND_TM_MAX)
+    {
+        DetectLog.append(BaudLog[eInverterDetectStep]);
     }
     sMyInverterDetectState.eDetectProtocolStep = eDetectInverterProtocol[eInverterDetectStep];
     /*
@@ -278,7 +292,16 @@ void MainWindow::vFindInverterProcess()
             show.append(",");
             show.append(SerialSettings.stringStopBits);
             mainCommConnect = true;
-            this->wSerialSend((SIGNED8*)byFeelInverterPacketTM,sizeof(byFeelInverterPacketTM));
+            this->wSerialSend((SIGNED8*)byFeelBuff,byFeelLen);
+            #if DEBUG_DEVICE_DETECT == 1
+            qDebug()<<"send Feel String:";
+            UNSIGNED8 byIx;
+            for(byIx=0 ; byIx<byFeelLen ; byIx++)
+            {
+
+                qDebug("0x%x",byFeelBuff[byIx]);
+            }
+            #endif
             TickTimer->start(1000);//this scale is ms
         }
         else
@@ -400,6 +423,94 @@ void MainWindow::vSetInverter2TM()
     }
 }
 
+void MainWindow::vDetectStepCheck()
+{
+    QString show;
+    UNSIGNED8 kk;
+
+    if(sMyInverterDetectState.bDetectInverterFinish)
+    {
+        QString show;
+        show.append("已经找到变频器");
+        ui->textBrowserResponse->append(show);
+        ui->pushButtonFoundInverter->setEnabled(true);
+    }
+    else
+    {
+        if(byStopBit < MAX_LOOP_STOPBIT)
+        {
+            byStopBit++;
+        }
+        else
+        {
+            if(eInverterDetectStep < INVERTER_FOUND_TM_115200)
+            {
+                kk = (UNSIGNED8)eInverterDetectStep;
+                kk++;
+
+                eInverterDetectStep = ((E_FOUND_INVERTER_STEP)kk);
+            }
+            else
+            {
+                show.append("寻找变频器失败，请将设备设置成FC协议，9600，偶校验");
+                ui->textBrowserResponse->append(show);
+                ui->pushButtonFoundInverter->setEnabled(true);
+                return;
+            }
+        }
+        vDetectCloseCom();
+        Sleep(1000);
+        vFindInverterProcess();
+    }
+}
+
+void MainWindow::vDetectCloseCom()
+{
+    QString show;
+
+    mainSerial->close();
+    show.append(SerialSettings.name);
+    show.append("断开连接");
+    mainCommConnect = false;
+    ui->textBrowserResponse->append(show);
+}
+
+bool MainWindow::bParseSerialMsg()
+{
+    UNSIGNED8 bytmpCrc;
+    bool bRet = true;
+    switch(sMyInverterDetectState.eDetectProtocolStep)
+    {
+        case INVERTER_PROCOTOL_FC:
+        if(16 != byComParseLen)
+        {
+            bRet = false;
+        }
+        if(2 != cComParseBuff[0])
+        {
+            bRet = false;
+        }
+        bytmpCrc = FcCheckSum((UNSIGNED8 *)cComParseBuff,STD_FC_DATA_INDEX_END);
+        qDebug("tmp crc = %x",bytmpCrc);
+        if((cComParseBuff[15]&UNSIGNED8MASK) != bytmpCrc)
+        {
+            bRet = false;
+            qDebug("1=%x , 2=%x",cComParseBuff[15]&UNSIGNED8MASK,bytmpCrc);
+        }
+        break;
+
+        case INVERTER_PROCOTOL_MODBUS:
+        break;
+
+        case INVERTER_PROCOTOL_TM:
+        break;
+
+        default:break;
+    }
+
+    return bRet;
+}
+
 void MainWindow::on_pushButtonFoundInverter_clicked()
 {
     ui->pushButtonFoundInverter->setDisabled(true);
@@ -426,13 +537,15 @@ void MainWindow::readData()
 {
     QString show;
 
+
+
     if(mainCommConnect)
     {
         memset(byMsgBuff,0,sizeof(byMsgBuff));
 
         QByteArray todRcvBuf = mainSerial->readAll();
-        show = todRcvBuf.data();
-        ui->textBrowserResponse->append(show);
+        //show = todRcvBuf.data();
+        //ui->textBrowserResponse->append(str);
 
         if(todRcvBuf.isEmpty())
         {
@@ -455,9 +568,10 @@ void MainWindow::readData()
                 byComParseLen = 0;
                 memset(cComParseBuff,0,sizeof(cComParseBuff));
             }
-            memcpy(cComParseBuff+byBuffRxLen,pcBuffRxPos,byBuffRxLen);
-            byBuffRxLen += byBuffRxLen;
+            memcpy(cComParseBuff+byComParseLen,pcBuffRxPos,byBuffRxLen);
+            byComParseLen += byBuffRxLen;
         }
+
     }
 }
 
@@ -470,17 +584,25 @@ void MainWindow::vParseDetectPacket()
      *
      *
     */
+    if(bParseSerialMsg())
+    {
+        /*
+         *
+         *if parse packet succeed set  sMyInverterDetectState.bDetectInverterFinish = true
+         *
+         *
+         */
+        sMyInverterDetectState.bDetectInverterFinish = true;
+        qDebug()<<"校验成功";
+    }
+#if 0
+    int bx;
+    for(bx=0 ; bx<byComParseLen ; bx++)
+    {
+        printf(" 0x%x(%d) ",cComParseBuff[bx],byComParseLen);
+    }
+#endif
 
-
-
-    /*
-     *
-     *if parse packet succeed set  sMyInverterDetectState.bDetectInverterFinish = true
-     *
-     *
-     */
-    QString show;
-    show.append("已经找到变频器");
 
     /*
      *
@@ -488,4 +610,6 @@ void MainWindow::vParseDetectPacket()
      *
      *
     */
+    vDetectStepCheck();
+
 }
